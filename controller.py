@@ -28,7 +28,7 @@ class CONSYS:
             plant_output = self.plant.update_H(U)
             error = self.plant.H_0 - plant_output 
             error_history.append(error)
-            U = self.controller.compute(error)
+            U = self.controller.compute(error) #Får masse Nan verdier
         mse = jnp.mean(jnp.array(error_history)**2)
         return mse
 
