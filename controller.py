@@ -18,7 +18,7 @@ class CONSYS:
         for epoch in range (1,num_epochs):
             self.plant.reset()
             self.controller.error_history = jnp.zeros(timesteps)
-            mse, gradients = gradfunc(self.controller.get_params(), timesteps)
+            mse, gradients = gradfunc(self.controller.get_params(), timesteps) #trenger en if-setning her
             #print("gradients", gradients)
             mse_history.append(mse)
             self.controller.update_params(self.learning_rate, gradients)
@@ -27,7 +27,7 @@ class CONSYS:
         self.controller.plot(mse_history)
         return mse_history
 
-    def run_one_epoch(self, params, timesteps): 
+    def run_one_epoch(self, params, timesteps): #denne er kanskje unik for PIDcontroller
         U = 0
         for t in range(timesteps):
             plant_output = self.plant.update(U) 
@@ -37,7 +37,23 @@ class CONSYS:
         mse = jnp.mean(jnp.square(self.controller.error_history))
         return mse
     
+    def jaxrun(self, num_epochs, ncases):
+        features,targets = generate_data_cases(ncases) #er dette info om planten?
+        params = controller.gen_jaxnet_params(self.controller.layers)
+        params, mse_his = controller.jaxnet_train(params,features,targets,num_epochs,lrate=self.learning_rate)
+
+    def jaxnet_train(params,features,targets,num_epochs,lrate):
+        mse_history = []
+        curr_params = params
+        for _ in range(num_epochs):
+            curr_params, mse = jaxnet_train_one_epoch(curr_params,features,targets,lrate)
+            mse_history.append(mse)
+        return current_params, mse_history #returnerer nåværende parametere
     
+    def jaxnet_train_one_epoch(params,features,targets,lrate=0.1):
+        mse, gradients = jax.value_and_grad(controller.jaxnet_loss)(params, features,targets)
+        return [(w - lrate * dw, b - lrate * db)
+        for (w, b), (dw, db) in zip(params, gradients)], mse
 
 class PIDController:
     def __init__(self, kp, ki, kd, timesteps, target):
@@ -90,6 +106,46 @@ class PIDController:
         plt.legend()
         plt.grid(True)
         plt.show()
+
+class NeuralController:
+    def __init__(self, layers, timesteps, target, lower, upper, activation_functions):
+        self.params = []
+        self.layers = layers
+        self.error_history = jnp.zeros(timesteps)
+        self.target = target
+        self.lower = lower
+        self.upper = upper
+        self.activiation_functions = activation_functions
+        
+    def gen_jaxnet_params(self, layers): #layrs er liste med antal neurons i hvert layer
+        sender = layers[0]
+        params = []
+        for receiver in layers[1:]:
+            weights = np.random.uniform(self.lower,self.upper,(sender,receiver))
+            biases = np.random.uniform(self.lower,self.upper,(1,receiver))
+            sender = receiver
+            params.append([weights, biases])
+        self.params = params
+        return params  
+    
+    def get_params(self):
+        return self.params
+   
+    def jaxnet_loss(self, params, features, targets):
+        batched_predict = jax.vmap(self.predict, in_axes=(None, 0)) #Hva gjør denne?
+        predictions = batched_predict(params, features)
+        return jnp.mean(jnp.square(targets - predictions)) #er dette U eller error?
+
+    def predict(self, all_params, features): #dette er kun med sigmoid
+        def sigmoid(x):
+            return 1 / (1 + jnp.exp(-x))
+        activations = features
+        for weights, biases in all_params:
+            activations = sigmoid(jnp.dot(activations,weights) + biases)
+        return activations
+    
+
+#PLANTS:
 
 
 class BathTubPlant:
@@ -154,7 +210,7 @@ class CournotPlant:
         return P1
        
 #Funker ikke
-class HeaterRoomPlant:
+class HeaterRoomPlant: #insulingregulering
     def __init__(self, initial_temp, lower_noise, upper_noise):
         self.temperature = initial_temp  # Initial room temperature
         self.lower_noise = lower_noise
