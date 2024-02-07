@@ -1,0 +1,36 @@
+{
+    "PID": {
+        "kp": 0.01, 
+        "ki": 0.01,
+        "kd": 0.01
+    },
+    "Neural":{
+        "layers": [5,10,5,3,2],
+        "activation_function": "tanh",
+        "lower_p": -0.01,
+        "upper_p": 0.01
+    },
+    "Disturbance": {
+        "rangeNoiseLower": -0.01,
+        "rangeNoiseUpper": 0.01
+    },
+    "Consys": {
+        "num_epochs": 1000,
+        "learning_rate": 0.05,
+        "timesteps": 10
+    },
+    "Bathtub": {
+        "A": 100,
+        "C": 1,
+        "H0": 1
+    },
+    "CournotPlant": {
+        "pmax": 3.5,
+        "c_m": 0.1,
+        "T": 3.2
+    },
+    "HeaterRoom": {
+        "initial_temp": 20,
+        "target_temp": 22
+    }
+}
